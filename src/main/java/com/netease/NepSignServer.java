@@ -183,20 +183,63 @@ public class NepSignServer {
     
     private static String extractJsonValue(String json, String key) {
         // 简单的 JSON 值提取
-        String pattern = "\"" + key + "\"\\s*:\\s*\"";
-        int start = json.indexOf(pattern);
-        if (start == -1) return null;
-        
-        start += pattern.length() - 1;
-        int end = json.indexOf("\"", start + 1);
-        
-        // 处理转义引号
-        while (end > 0 && json.charAt(end - 1) == '\\') {
-            end = json.indexOf("\"", end + 1);
+        String keyPattern = "\"" + key + "\":";
+        int keyStart = json.indexOf(keyPattern);
+        if (keyStart == -1) {
+            // 尝试带空格的格式
+            keyPattern = "\"" + key + "\": ";
+            keyStart = json.indexOf(keyPattern);
+            if (keyStart == -1) return null;
         }
         
-        if (end == -1) return null;
-        return json.substring(start + 1, end);
+        int valueStart = keyStart + keyPattern.length();
+        // 跳过可能的空格
+        while (valueStart < json.length() && json.charAt(valueStart) == ' ') {
+            valueStart++;
+        }
+        
+        if (valueStart >= json.length()) return null;
+        
+        // 检查是否是字符串值（以引号开头）
+        if (json.charAt(valueStart) != '"') return null;
+        
+        // 找到字符串结束位置，正确处理转义字符
+        StringBuilder result = new StringBuilder();
+        int i = valueStart + 1;
+        while (i < json.length()) {
+            char c = json.charAt(i);
+            if (c == '\\' && i + 1 < json.length()) {
+                // 处理转义字符
+                char next = json.charAt(i + 1);
+                if (next == '"') {
+                    result.append('"');
+                    i += 2;
+                } else if (next == '\\') {
+                    result.append('\\');
+                    i += 2;
+                } else if (next == 'n') {
+                    result.append('\n');
+                    i += 2;
+                } else if (next == 'r') {
+                    result.append('\r');
+                    i += 2;
+                } else if (next == 't') {
+                    result.append('\t');
+                    i += 2;
+                } else {
+                    result.append(c);
+                    i++;
+                }
+            } else if (c == '"') {
+                // 找到结束引号
+                break;
+            } else {
+                result.append(c);
+                i++;
+            }
+        }
+        
+        return result.toString();
     }
     
     private static String escapeJson(String s) {
